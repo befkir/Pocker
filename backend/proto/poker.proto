@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package poker.v1;
+
+option go_package = ".";
+
+// A single card is represented as a two-character string: value+rank
+// e.g. "HA" heart ace, "S7" spade seven, "CT" club ten.
+
+message CardList {
+  repeated string cards = 1;
+}
+
+// Result of evaluating a hand.
+enum HandRank {
+  HAND_RANK_UNSPECIFIED = 0;
+  HIGH_CARD = 1;
+  PAIR = 2;
+  TWO_PAIR = 3;
+  THREE_OF_A_KIND = 4;
+  STRAIGHT = 5;
+  FLUSH = 6;
+  FULL_HOUSE = 7;
+  FOUR_OF_A_KIND = 8;
+  STRAIGHT_FLUSH = 9;
+  ROYAL_FLUSH = 10;
+}
+
+message EvaluateRequest {
+  CardList hole_cards = 1;        // exactly 2 cards
+  CardList community_cards = 2;   // 0..5 cards
+}
+
+message EvaluateResponse {
+  HandRank rank = 1;
+  string description = 2; // human-readable name of the best hand
+}
+
+message CompareRequest {
+  EvaluateRequest first = 1;
+  EvaluateRequest second = 2;
+}
+
+message CompareResponse {
+  // 1 means first wins, 2 means second wins, 0 means tie
+  int32 winner = 1;
+  EvaluateResponse first_evaluation = 2;
+  EvaluateResponse second_evaluation = 3;
+}
+
+message MonteCarloRequest {
+  CardList hole_cards = 1;
+  CardList community_cards = 2;
+  int32 players = 3;
+  int32 simulations = 4;
+}
+
+message MonteCarloResponse {
+  double win_probability = 1; // between 0 and 1
+}
+
+service PokerService {
+  rpc Evaluate (EvaluateRequest) returns (EvaluateResponse);
+  rpc Compare (CompareRequest) returns (CompareResponse);
+  rpc MonteCarlo (MonteCarloRequest) returns (MonteCarloResponse);
+}
