@@ -71,54 +71,150 @@ class PokerHome extends StatefulWidget {
 }
 
 class _PokerHomeState extends State<PokerHome> {
-  late TextEditingController holeCard1Controller;
-  late TextEditingController holeCard2Controller;
-  late TextEditingController communityCards1Controller;
-  late TextEditingController communityCards2Controller;
-  late TextEditingController communityCards3Controller;
-  late TextEditingController communityCards4Controller;
-  late TextEditingController communityCards5Controller;
-  late TextEditingController numPlayersController;
-  late TextEditingController simulationsController;
+  final TextEditingController numPlayersController = TextEditingController(text: '2');
+  final TextEditingController simulationsController = TextEditingController(text: '10000');
 
   String resultMessage = '';
   String resultValue = '';
   bool isLoading = false;
 
-    String get backendUrl {
-      final host = Uri.base.host;
-      if (host.isEmpty || host == 'localhost' || host == '127.0.0.1') {
-        return 'http://localhost:8080';
-      }
-      return Uri.base.origin;
-    }
-
-  @override
-  void initState() {
-    super.initState();
-    holeCard1Controller = TextEditingController();
-    holeCard2Controller = TextEditingController();
-    communityCards1Controller = TextEditingController();
-    communityCards2Controller = TextEditingController();
-    communityCards3Controller = TextEditingController();
-    communityCards4Controller = TextEditingController();
-    communityCards5Controller = TextEditingController();
-    numPlayersController = TextEditingController(text: '2');
-    simulationsController = TextEditingController(text: '10000');
-  }
+  List<String?> holeCards = [null, null];
+  List<String?> communityCards = [null, null, null, null, null];
+  
+  final List<String> suits = ['H', 'D', 'C', 'S'];
+  final List<String> ranks = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
 
   @override
   void dispose() {
-    holeCard1Controller.dispose();
-    holeCard2Controller.dispose();
-    communityCards1Controller.dispose();
-    communityCards2Controller.dispose();
-    communityCards3Controller.dispose();
-    communityCards4Controller.dispose();
-    communityCards5Controller.dispose();
     numPlayersController.dispose();
     simulationsController.dispose();
     super.dispose();
+  }
+
+  String get backendUrl {
+    final host = Uri.base.host;
+    if (host.isEmpty || host == 'localhost' || host == '127.0.0.1') {
+      return 'http://localhost:8080';
+    }
+    return Uri.base.origin;
+  }
+
+  void _openCardPicker(int index, bool isHoleCard) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1A2E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'SELECT CARD',
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Expanded(
+                child: GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 6,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                    childAspectRatio: 0.7,
+                  ),
+                  itemCount: 52,
+                  itemBuilder: (context, i) {
+                    final suit = suits[i ~/ 13];
+                    final rank = ranks[i % 13];
+                    final card = '$rank$suit'; // Changed to RankSuit format
+                    
+                    // Check if already selected
+                    final isSelected = holeCards.contains(card) || communityCards.contains(card);
+                    
+                    return InkWell(
+                      onTap: isSelected ? null : () {
+                        setState(() {
+                          if (isHoleCard) {
+                            holeCards[index] = card;
+                          } else {
+                            communityCards[index] = card;
+                          }
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isSelected ? Colors.white10 : const Color(0xFF16213E),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSelected ? Colors.transparent : Colors.white24,
+                          ),
+                        ),
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                rank == 'T' ? '10' : rank,
+                                style: GoogleFonts.dmSans(
+                                  color: isSelected ? Colors.white24 : _getSuitColor(suit),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              _getSuitIcon(suit, isSelected ? Colors.white24 : _getSuitColor(suit)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    if (isHoleCard) {
+                      holeCards[index] = null;
+                    } else {
+                      communityCards[index] = null;
+                    }
+                  });
+                  Navigator.pop(context);
+                },
+                child: Text('CLEAR SLOT', style: GoogleFonts.dmSans(color: Colors.redAccent)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Color _getSuitColor(String suit) {
+    if (suit == 'H' || suit == 'D') return Colors.redAccent;
+    return Colors.white70;
+  }
+
+  Widget _getSuitIcon(String suit, Color color) {
+    IconData icon;
+    switch (suit) {
+      case 'H': icon = Icons.favorite; break;
+      case 'D': icon = Icons.diamond; break;
+      case 'C': icon = Icons.auto_awesome_mosaic; break; // Placeholder for Club
+      case 'S': icon = Icons.spa; break; // Placeholder for Spade
+      default: icon = Icons.help;
+    }
+    return Icon(icon, color: color, size: 14);
   }
 
     Future<void> evaluate() async {
@@ -129,33 +225,24 @@ class _PokerHomeState extends State<PokerHome> {
     });
 
     try {
-      final holeCards = [holeCard1Controller.text, holeCard2Controller.text]
-          .where((c) => c.trim().isNotEmpty)
-          .toList();
-
-      if (holeCards.length != 2) {
+      final selectedHole = holeCards.whereType<String>().toList();
+      if (selectedHole.length != 2) {
         setState(() {
           resultMessage = 'Input Required';
-          resultValue = 'Please enter exactly 2 hole cards (e.g. As, Kh)';
+          resultValue = 'Please select exactly 2 hole cards.';
           isLoading = false;
         });
         return;
       }
 
-      final community = [
-        communityCards1Controller.text,
-        communityCards2Controller.text,
-        communityCards3Controller.text,
-        communityCards4Controller.text,
-        communityCards5Controller.text,
-      ].where((c) => c.trim().isNotEmpty).toList();
+      final selectedCommunity = communityCards.whereType<String>().toList();
 
       final response = await http.post(
         Uri.parse('$backendUrl/poker/evaluate'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'hole_cards': holeCards,
-          'community_cards': community,
+          'hole_cards': selectedHole,
+          'community_cards': selectedCommunity,
         }),
       );
 
@@ -191,33 +278,24 @@ class _PokerHomeState extends State<PokerHome> {
     });
 
     try {
-      final holeCards = [holeCard1Controller.text, holeCard2Controller.text]
-          .where((c) => c.trim().isNotEmpty)
-          .toList();
-      
-      if (holeCards.length != 2) {
+      final selectedHole = holeCards.whereType<String>().toList();
+      if (selectedHole.length != 2) {
         setState(() {
           resultMessage = 'Input Required';
-          resultValue = 'Please enter exactly 2 hole cards (e.g. As, Kh)';
+          resultValue = 'Please select exactly 2 hole cards.';
           isLoading = false;
         });
         return;
       }
 
-      final community = [
-        communityCards1Controller.text,
-        communityCards2Controller.text,
-        communityCards3Controller.text,
-        communityCards4Controller.text,
-        communityCards5Controller.text,
-      ].where((c) => c.trim().isNotEmpty).toList();
+      final selectedCommunity = communityCards.whereType<String>().toList();
 
       final response = await http.post(
         Uri.parse('$backendUrl/poker/montecarlo'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'hole_cards': holeCards,
-          'community_cards': community,
+          'hole_cards': selectedHole,
+          'community_cards': selectedCommunity,
           'players': int.tryParse(numPlayersController.text) ?? 2,
           'simulations': int.tryParse(simulationsController.text) ?? 10000,
         }),
@@ -249,23 +327,43 @@ class _PokerHomeState extends State<PokerHome> {
     }
   }
 
-  Widget _buildCardInput(TextEditingController controller, String hint) {
-    return Expanded(
-      child: Center(
-        child: Container(
-          width: 60,
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          child: TextField(
-            controller: controller,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.dmSans(
-                fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-            textCapitalization: TextCapitalization.characters,
-            decoration: InputDecoration(
-              hintText: hint,
-              contentPadding: const EdgeInsets.symmetric(vertical: 20),
-            ),
+    Widget _buildCardSlot(int index, bool isHoleCard) {
+    final card = isHoleCard ? holeCards[index] : communityCards[index];
+    final hasCard = card != null;
+    final suit = hasCard ? card.substring(card.length - 1) : '';
+    final rank = hasCard ? card.substring(0, card.length - 1) : '';
+
+    return GestureDetector(
+      onTap: () => _openCardPicker(index, isHoleCard),
+      child: Container(
+        width: 60,
+        height: 80,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          color: hasCard ? const Color(0xFF16213E) : Colors.white10,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: hasCard ? _getSuitColor(suit).withOpacity(0.5) : Colors.white24,
+            width: 2,
           ),
+        ),
+        child: Center(
+          child: hasCard
+              ? Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      rank == 'T' ? '10' : rank,
+                      style: GoogleFonts.dmSans(
+                        color: _getSuitColor(suit),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                      ),
+                    ),
+                    _getSuitIcon(suit, _getSuitColor(suit)),
+                  ],
+                )
+              : const Icon(Icons.add, color: Colors.white24, size: 24),
         ),
       ),
     );
@@ -304,25 +402,12 @@ class _PokerHomeState extends State<PokerHome> {
               _buildSectionCard(
                 title: 'HOLE CARDS',
                 icon: Icons.style,
-                child: Column(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildCardInput(holeCard1Controller, 'As'),
-                        const SizedBox(width: 8),
-                        _buildCardInput(holeCard2Controller, 'Kh'),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Format: Ah, 10s, Kh, As',
-                      style: GoogleFonts.dmSans(
-                        fontSize: 12,
-                        color: Colors.white70,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
+                    _buildCardSlot(0, true),
+                    const SizedBox(width: 8),
+                    _buildCardSlot(1, true),
                   ],
                 ),
               ),
@@ -337,17 +422,17 @@ class _PokerHomeState extends State<PokerHome> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildCardInput(communityCards1Controller, 'C1'),
-                        _buildCardInput(communityCards2Controller, 'C2'),
-                        _buildCardInput(communityCards3Controller, 'C3'),
+                        _buildCardSlot(0, false),
+                        _buildCardSlot(1, false),
+                        _buildCardSlot(2, false),
                       ],
                     ),
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildCardInput(communityCards4Controller, 'C4'),
-                        _buildCardInput(communityCards5Controller, 'C5'),
+                        _buildCardSlot(3, false),
+                        _buildCardSlot(4, false),
                       ],
                     ),
                   ],

@@ -59,24 +59,87 @@ func parseCard(card string) (Card, error) {
 // and c1-c4 are card values in descending order
 type HandValue [5]int
 
-// EvaluateHand takes 7 cards and returns the best 5-card hand
+// EvaluateHand takes 2-7 cards and returns the best hand value
 func evaluateHand(allCards []Card) (HandValue, error) {
-	if len(allCards) != 7 {
-		return HandValue{}, errors.New("need exactly 7 cards")
+	// Filter out empty cards (if any)
+	var cards []Card
+	for _, c := range allCards {
+		if c.Suit != 0 {
+			cards = append(cards, c)
+		}
 	}
 
-	// Find the best 5-card hand from 7 cards
+	n := len(cards)
+	if n < 2 {
+		return HandValue{}, errors.New("need at least 2 cards")
+	}
+	if n > 7 {
+		return HandValue{}, errors.New("too many cards (max 7)")
+	}
+
+	if n < 5 {
+		return scoreSmallHand(cards), nil
+	}
+
+	// Find the best 5-card hand from n cards
 	best := HandValue{-1}
-	combinations := combinations(allCards, 5)
+	combinations := combinations(cards, 5)
 
 	for _, five := range combinations {
 		value := scoreHand(five)
-		if value[0] > best[0] || 
+		if value[0] > best[0] ||
 			(value[0] == best[0] && compareKickers(value, best) > 0) {
 			best = value
 		}
 	}
 	return best, nil
+}
+
+// scoreSmallHand evaluates hands with 2-4 cards (Pre-flop, Flop/Turn partial)
+func scoreSmallHand(cards []Card) HandValue {
+	ranks := make([]int, len(cards))
+	for i, c := range cards {
+		ranks[i] = c.Rank
+	}
+	sort.Slice(ranks, func(i, j int) bool { return ranks[i] > ranks[j] })
+
+	counts := countRanks(ranks)
+	freqs := make(map[int]int)
+	for _, count := range counts {
+		freqs[count]++
+	}
+
+	// 4 of a kind (possible with 4 cards)
+	if freqs[4] > 0 {
+		return HandValue{7, findRank(ranks, 4), 0, 0, 0}
+	}
+	// 3 of a kind
+	if freqs[3] > 0 {
+		kicker := 0
+		if len(ranks) > 3 { kicker = findRank(ranks, 1) }
+		return HandValue{3, findRank(ranks, 3), kicker, 0, 0}
+	}
+	// Two pair (possible with 4 cards)
+	if freqs[2] >= 2 {
+		pairs := findRanks(ranks, 2, 2)
+		sort.Slice(pairs, func(i, j int) bool { return pairs[i] > pairs[j] })
+		return HandValue{2, pairs[0], pairs[1], 0, 0}
+	}
+	// Pair
+	if freqs[2] > 0 {
+		pair := findRank(ranks, 2)
+		kickers := findRanks(ranks, 1, 2)
+		k1, k2 := 0, 0
+		if len(kickers) > 0 { k1 = kickers[0] }
+		if len(kickers) > 1 { k2 = kickers[1] }
+		return HandValue{1, pair, k1, k2, 0}
+	}
+	// High card
+	hv := HandValue{0}
+	for i := 0; i < len(ranks) && i < 4; i++ {
+		hv[i+1] = ranks[i]
+	}
+	return hv
 }
 
 // scoreHand evaluates a 5-card hand
